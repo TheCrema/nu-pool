@@ -216,6 +216,85 @@ class Bittrex(Exchange):
         return orders
 
 
+class SouthXChange(Exchange):
+    def __init__(self):
+        super(SouthXChange, self).__init__(0)  # this must be adjusted
+        self.key = None
+        self.secret = None
+
+    def __repr__(self):
+        return 'southxchange'
+
+    def adjust(self, error):
+        pass
+
+    def post(self, method, key, secret, params=None):
+        self.key = key
+        self.secret = secret
+        data = {'nonce': self.nonce(), 'key': key}
+        if params is not None:
+            data.update(params)
+        data = json.dumps(data)
+        sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
+        headers = {'Hash': sign, 'Content-Type': 'application/json'}
+        url = 'https://www.southxchange.com/api/{0}/'.format(method)
+        request = urllib2.Request(url=url, data=data, headers=headers)
+        return json.loads(urllib2.urlopen(request).read())
+
+    def get(self, method, key, secret, unit=None):
+        url = 'https://www.southxchange.com/api/{0}/'.format(method)
+        if unit is not None:
+            url += "NBT/" + unit.upper()
+        request = urllib2.Request(url=url)
+        return json.loads(urllib2.urlopen(request).read())
+
+    def get_price(self, unit):
+        response = self.get('price', self.key, self.secret, unit)
+
+    def place_order(self, unit, side, key, secret, amount, price):
+        method = 'placeOrder'
+        if side == 'bid':
+            listCurrency = unit.upper()
+            referenceCurrency = 'NBT'
+        else:
+            listCurrency = 'NBT'
+            referenceCurrency = unit.upper()
+        params = {'listCurrency': listCurrency,
+                'referenceCurrency': referenceCurrency,
+                'type': 'buy' if side == 'bid' else 'sell',
+                'amount': amount,
+                'limitPrice': price}
+        return self.post(method, key, secret, params)
+
+    def __list_orders(self):
+        method = 'listOrders'
+        return self.post(method, self.key, self.secret)
+
+    def cancel_orders(self, unit, side, key, secret):
+        method = 'cancelOrder'
+        allOrders = self.__list_orders()
+        orderCode = None
+        if side == 'bid':
+            listCurrency = unit.upper()
+            referenceCurrency = 'NBT'
+        else:
+            listCurrency = 'NBT'
+            referenceCurrency = unit.upper()
+        for order in allOrders:
+            if order['ListingCurrency'] == listCurrency and order['ReferenceCurrency'] == referenceCurrency:
+                orderCode = order['Code']
+                break
+        if orderCode is not None:
+            self.post(method, key, secret, {'orderCode': orderCode})
+
+    def get_balance(self, unit, key, secret):
+        response = self.post('listBalances', key, secret)
+        unit = unit.upper()
+        for balance in response:
+            if balance['Currency'] == unit:
+                return balance['Available']
+
+
 class Poloniex(Exchange):
     def __init__(self):
         super(Poloniex, self).__init__(0.002)
