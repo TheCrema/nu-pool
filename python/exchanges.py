@@ -241,7 +241,7 @@ class SouthXChange(Exchange):
         request = urllib2.Request(url=url, data=data, headers=headers)
         return json.loads(urllib2.urlopen(request).read())
 
-    def get(self, method, key, secret, unit=None):
+    def get(self, method, unit=None):
         url = 'https://www.southxchange.com/api/{0}/'.format(method)
         if unit is not None:
             url += "NBT/" + unit.upper()
@@ -249,7 +249,11 @@ class SouthXChange(Exchange):
         return json.loads(urllib2.urlopen(request).read())
 
     def get_price(self, unit):
-        response = self.get('price', self.key, self.secret, unit)
+        price = {}
+        response = self.get('price', unit)
+        price['bid'] = response['Bid']
+        price['ask'] = response['Ask']
+        return price
 
     def place_order(self, unit, side, key, secret, amount, price):
         method = 'placeOrder'
@@ -293,6 +297,21 @@ class SouthXChange(Exchange):
         for balance in response:
             if balance['Currency'] == unit:
                 return balance['Available']
+
+    def create_request(self, unit, key=None, secret=None):
+        if not secret and not key:
+            return None, None
+        data = {'nonce': self.nonce(), 'key': key}
+        data = json.dumps(data)
+        sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
+        return data, sign
+
+    def validate_request(self, key, unit, data, sign):
+        headers = {'Hash': sign, 'Content-Type': 'application/json'}
+        url = 'https://www.southxchange.com/api/listOrders'
+        request = urllib2.Request(url=url, data=data, headers=headers, timeout=5)
+        return json.loads(urllib2.urlopen(request).read())
+
 
 
 class Poloniex(Exchange):
