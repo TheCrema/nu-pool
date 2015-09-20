@@ -219,11 +219,9 @@ class Bittrex(Exchange):
 class SouthXChange(Exchange):
     def __init__(self):
         super(SouthXChange, self).__init__(0)  # this must be adjusted
-        self.key = None
-        self.secret = None
 
     def __repr__(self):
-        return 'southxchange'
+        return 'southx'
 
     def adjust(self, error):
         pass
@@ -244,7 +242,7 @@ class SouthXChange(Exchange):
     def get(self, method, unit=None):
         url = 'https://www.southxchange.com/api/{0}/'.format(method)
         if unit is not None:
-            url += "NBT/" + unit.upper()
+            url += unit.upper() + "/NBT"
         request = urllib2.Request(url=url)
         return json.loads(urllib2.urlopen(request).read())
 
@@ -257,54 +255,42 @@ class SouthXChange(Exchange):
 
     def place_order(self, unit, side, key, secret, amount, price):
         method = 'placeOrder'
-        if side == 'bid':
-            listCurrency = unit.upper()
-            referenceCurrency = 'NBT'
-        else:
-            listCurrency = 'NBT'
-            referenceCurrency = unit.upper()
-        params = {'listCurrency': listCurrency,
-                'referenceCurrency': referenceCurrency,
+        params = {'listCurrency': 'NBT',
+                'referenceCurrency': unit.upper(),
                 'type': 'buy' if side == 'bid' else 'sell',
                 'amount': amount,
                 'limitPrice': price}
         return self.post(method, key, secret, params)
 
-    def __list_orders(self):
+    def __list_orders(self, key, secret):
         method = 'listOrders'
-        return self.post(method, self.key, self.secret)
+        return self.post(method, key, secret)
 
     def cancel_orders(self, unit, side, key, secret):
         method = 'cancelOrder'
-        allOrders = self.__list_orders()
-        orderCode = None
-        if side == 'bid':
-            listCurrency = unit.upper()
-            referenceCurrency = 'NBT'
-        else:
-            listCurrency = 'NBT'
-            referenceCurrency = unit.upper()
+        allOrders = self.__list_orders(key, secret)
         for order in allOrders:
-            if order['ListingCurrency'] == listCurrency and order['ReferenceCurrency'] == referenceCurrency:
-                orderCode = order['Code']
-                break
-        if orderCode is not None:
-            self.post(method, key, secret, {'orderCode': orderCode})
+            if side == 'all' or (side == 'bid' and order['Type'] == 'buy') or (side == 'ask' and order['Type'] == 'sell'):
+                if order['ListingCurrency'] == 'NBT' and order['ReferenceCurrency'] == unit.upper():
+                    self.post(method, key, secret, {'orderCode': order['Code']})
+        return {'success': 'nothing to cancel'}
+            
 
     def get_balance(self, unit, key, secret):
         response = self.post('listBalances', key, secret)
         unit = unit.upper()
         for balance in response:
             if balance['Currency'] == unit:
-                return balance['Available']
+                return { 'balance': balance['Available']}
+        return {'balance': 0}
 
     def create_request(self, unit, key=None, secret=None):
         if not secret and not key:
             return None, None
-        data = {'nonce': self.nonce(), 'key': key}
-        data = json.dumps(data)
+        request = {'nonce': self.nonce(), 'key': key}
+        data = json.dumps(request)
         sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
-        return data, sign
+        return request, sign
 
     def validate_request(self, key, unit, data, sign):
         headers = {'Hash': sign, 'Content-Type': 'application/json'}

@@ -39,8 +39,7 @@ from exchanges import *
 from trading import *
 from utils import *
 
-_wrappers = {'bittrex': Bittrex, 'poloniex': Poloniex, 'ccedk': CCEDK, 'bitcoincoid': BitcoinCoId, 'bter': BTER,
-             'testing': Peatio}
+_wrappers = {'bittrex': Bittrex, 'poloniex': Poloniex, 'ccedk': CCEDK, 'bitcoincoid': BitcoinCoId, 'bter': BTER, 'testing': Peatio, 'southx': SouthXChange}
 _mainlogger = None
 
 
@@ -143,7 +142,8 @@ class Client(ConnectionThread):
         if unit in self.users[key]:
             self.shutdown(key, unit)
         self.users[key][unit] = {
-            'request': RequestThread(self.conn, key, secret, exchange, unit, address, self.sampling, cost, self.logger)}
+            'request': RequestThread(self.conn, key, secret, exchange, unit, address, self.sampling, cost, self.logger)
+            }
         self.users[key][unit]['request'].start()
         target = {'bid': self.exchangeinfo[name][unit]['bid']['target'],
                   'ask': self.exchangeinfo[name][unit]['ask']['target']}
@@ -301,7 +301,6 @@ class Client(ConnectionThread):
         self.logger.info('stopping trading bots, please allow the client up to 1 minute to terminate')
         self.shutdown()
         self.lock.release()
-
 
 if __name__ == "__main__":
     logger = getlogger()
