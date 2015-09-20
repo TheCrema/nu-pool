@@ -296,8 +296,13 @@ class SouthXChange(Exchange):
         url = 'https://www.southxchange.com/api/listOrders'
         headers = {'Hash': sign, 'Content-Type': 'application/json'}
         request = urllib2.Request(url=url, data=data['data'], headers=headers)
-        response = urllib2.urlopen(request).read()
-        return json.loads(response)
+        response = json.loads(urllib2.urlopen(request).read())
+        return [{
+                    'id': int(order['Code']),
+                    'price': float(order['LimitPrice']),
+                    'type': 'ask' if order['Type'] == 'sell' else 'bid',
+                    'amount': float(order['Amount'])
+                } for order in response]
 
 
 class Poloniex(Exchange):
