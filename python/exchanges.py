@@ -218,7 +218,7 @@ class Bittrex(Exchange):
 
 class SouthXChange(Exchange):
     def __init__(self):
-        super(SouthXChange, self).__init__(0)  # this must be adjusted
+        super(SouthXChange, self).__init__(0.002)
 
     def __repr__(self):
         return 'southx'
@@ -255,8 +255,8 @@ class SouthXChange(Exchange):
 
     def place_order(self, unit, side, key, secret, amount, price):
         method = 'placeOrder'
-        params = {'listCurrency': 'NBT',
-                'referenceCurrency': unit.upper(),
+        params = {'listCurrency': unit.upper(),
+                'referenceCurrency': 'NBT',
                 'type': 'buy' if side == 'bid' else 'sell',
                 'amount': amount,
                 'limitPrice': price}
@@ -271,7 +271,7 @@ class SouthXChange(Exchange):
         allOrders = self.__list_orders(key, secret)
         for order in allOrders:
             if side == 'all' or (side == 'bid' and order['Type'] == 'buy') or (side == 'ask' and order['Type'] == 'sell'):
-                if order['ListingCurrency'] == 'NBT' and order['ReferenceCurrency'] == unit.upper():
+                if order['ListingCurrency'] == unit.upper() and order['ReferenceCurrency'] == 'NBT':
                     self.post(method, key, secret, {'orderCode': order['Code']})
         return {'success': 'nothing to cancel'}
             
@@ -290,14 +290,14 @@ class SouthXChange(Exchange):
         request = {'nonce': self.nonce(), 'key': key}
         data = json.dumps(request)
         sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
-        return request, sign
+        return {'data': data}, sign
 
     def validate_request(self, key, unit, data, sign):
-        headers = {'Hash': sign, 'Content-Type': 'application/json'}
         url = 'https://www.southxchange.com/api/listOrders'
-        request = urllib2.Request(url=url, data=data, headers=headers, timeout=5)
-        return json.loads(urllib2.urlopen(request).read())
-
+        headers = {'Hash': sign, 'Content-Type': 'application/json'}
+        request = urllib2.Request(url=url, data=data['data'], headers=headers)
+        response = urllib2.urlopen(request).read()
+        return json.loads(response)
 
 
 class Poloniex(Exchange):
